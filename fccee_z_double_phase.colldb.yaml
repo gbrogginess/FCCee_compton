@@ -1,0 +1,81 @@
+%YAML 1.2
+---
+All:
+  - &ALL     { parking: 0.030 }
+
+families:
+  # Betatron cleaning
+  - &TCPH   { <<: *ALL,  gap:  9.0, stage: primary,     material: MoGR,  length: 0.10   }
+  - &TCSH   { <<: *ALL,  gap: 11.0, stage: secondary,   material: Mo,    length: 0.30   }
+  - &TCTH   { <<: *ALL,  gap: 13.0, stage: tertiary,    material: MoGR,  length: 0.25   }
+  - &TCPV   { <<: *ALL,  gap: 60.0, stage: primary,     material: MoGR,  length: 0.10,  angle: 90  }
+  - &TCSV   { <<: *ALL,  gap: 75.0, stage: secondary,   material: Mo,    length: 0.30,  angle: 90  }
+  - &TCTV   { <<: *ALL,  gap: 75.0, stage: tertiary,    material: MoGR,  length: 0.25,  angle: 90  }
+  # Momentum cleaning
+  - &TCPHP  { <<: *ALL,  gap: 18.0, stage: primary,     material: MoGR,  length: 0.25   }
+  - &TCSHP  { <<: *ALL,  gap: 24.0, stage: secondary,   material: Mo,    length: 0.30   }
+  # Synchrotron radiation
+  - &TCRH   { <<: *ALL,  gap: 15.0, stage: SR,          material: Iner,  length: 0.10   }
+  - &TCRV   { <<: *ALL,  gap: 90.0, stage: SR,          material: Iner,  length: 0.10,  angle: 90  }
+
+emittance:
+  x: 64.2506e-06  # gemitt_x = 0.72e-9
+  y: 0.12761e-06  # gemitt_y = 1.43e-12
+
+collimators:
+  b1:
+    tcp.h.b1:           { <<: *TCPH,  s_center: 33149.31 }
+    tcs.h1.b1:          { <<: *TCSH,  s_center: 33384.91 }
+    tcs.h2.b1:          { <<: *TCSH,  s_center: 34273.92 }
+    tcp.v.b1:           { <<: *TCPV,  s_center: 33305.91 }
+    tcs.v1.b1:          { <<: *TCSV,  s_center: 33582.25 }
+  # tcs.v2.b1:          { <<: *TCSV,  s_center: -9999.99 } # no location with bety > 400 m (half-gas would be too small)
+
+    tcp.hh.b1:          { <<: *TCPH,  s_center: 33713.75 }
+    tcs.hh1.b1:         { <<: *TCSH,  s_center: 34183.24 }
+    tcs.hh2.b1:         { <<: *TCSH,  s_center: 34841.92 }
+    tcp.vv.b1:          { <<: *TCPV,  s_center: 34367.50 }
+    tcs.vv1.b1:         { <<: *TCSV,  s_center: 34677.72 } # serves also as non-optimal tcs.v2.b1
+  # tcs.vv2.b1:         { <<: *TCSV,  s_center: -9999.99 } # goes end of insertion where bety < 100 m
+
+    tcp.hp.b1:          { <<: *TCPHP, s_center: 79029.40 }
+    tcs.hp1.b1:         { <<: *TCSHP, s_center: 79545.00 }
+    tcs.hp2.b1:         { <<: *TCSHP, s_center: 80059.19 } # this is non-optimal as dx ~ 0 m
+
+    tct.v.1.b1:         { <<: *TCTV,  s_center: 22287.81 }
+    tct.h.1.b1:         { <<: *TCTH,  s_center: 22288.81 }
+    tct.v.2.b1:         { <<: *TCTV,  s_center: 44949.02 }
+    tct.h.2.b1:         { <<: *TCTH,  s_center: 44950.02 }
+    tct.v.3.b1:         { <<: *TCTV,  s_center: 67610.23 }
+    tct.h.3.b1:         { <<: *TCTH,  s_center: 67611.23 }
+    tct.v.4.b1:         { <<: *TCTV,  s_center: 90271.44 }
+    tct.h.4.b1:         { <<: *TCTH,  s_center: 90272.44 }
+
+    tcr.h3.1.b1:        { <<: *TCRH,  s_center: 22513.18 }
+    tcr.h2.1.b1:        { <<: *TCRH,  s_center: 22575.06 }
+    tcr.h1.1.b1:        { <<: *TCRH,  s_center: 22635.61 }
+    tcr.v.c2.1.b1:      { <<: *TCRV,  s_center: 22647.81 }
+    tcr.h.c2.1.b1:      { <<: *TCRH,  s_center: 22648.81 }
+
+    tcr.h3.2.b1:        { <<: *TCRH,  s_center: 45174.39 }
+    tcr.h2.2.b1:        { <<: *TCRH,  s_center: 45236.27 }
+    tcr.h1.2.b1:        { <<: *TCRH,  s_center: 45296.82 }
+    tcr.v.c2.2.b1:      { <<: *TCRV,  s_center: 45309.02 }
+    tcr.h.c2.2.b1:      { <<: *TCRH,  s_center: 45310.02 }
+
+    tcr.h3.3.b1:        { <<: *TCRH,  s_center: 67835.60 }
+    tcr.h2.3.b1:        { <<: *TCRH,  s_center: 67897.48 }
+    tcr.h1.3.b1:        { <<: *TCRH,  s_center: 67958.03 }
+    tcr.v.c2.3.b1:      { <<: *TCRV,  s_center: 67970.23 }
+    tcr.h.c2.3.b1:      { <<: *TCRH,  s_center: 67971.23 }
+
+    tcr.h3.4.b1:        { <<: *TCRH,  s_center: 90496.81 }
+    tcr.h2.4.b1:        { <<: *TCRH,  s_center: 90558.69 }
+    tcr.h1.4.b1:        { <<: *TCRH,  s_center: 90619.24 }
+    tcr.v.c2.4.b1:      { <<: *TCRV,  s_center: 90631.44 }
+    tcr.h.c2.4.b1:      { <<: *TCRH,  s_center: 90632.44 }
+
+
+
+
+
