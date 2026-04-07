@@ -137,7 +137,7 @@ laser_def = {
             'STOKES_3': 1
         },
         'photon_file': os.path.join(outputdata_dir, 'photons.hdf'),
-        'seed': jobID
+        'seed': jobID*2 + 1 # Always odd, always different for different jobs
     }
 }
 
