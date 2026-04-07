@@ -100,6 +100,19 @@ s_monitor = 78350.0
 mon = xc.EmittanceMonitor.install(line=line, name="emittance_monitor", at=s_monitor, stop_at_turn=N_TURNS)
 
 #################################################################
+# Install bounding apertures around emittance monitor
+#################################################################
+aper_name = 'emittance_monitor_aper'
+env.new(aper_name, xt.LimitEllipse, a=R_BEAMPIPE, b=R_BEAMPIPE)
+env.new(aper_name + '..0', aper_name, mode='replica')
+env.new(aper_name + '..1', aper_name, mode='replica')
+
+line.insert([
+    env.place(aper_name + '..0', at='emittance_monitor@start'),
+    env.place(aper_name + '..1', at='emittance_monitor@end')
+])
+
+#################################################################
 # Assign optics to collimators
 #################################################################
 twiss = line.twiss()
