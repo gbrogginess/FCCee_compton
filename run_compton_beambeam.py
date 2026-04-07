@@ -18,7 +18,7 @@ jobID = int(sys.argv[1])
 #################################################################
 # Laser-interaction
 #################################################################
-CAIN_PATH = '/home/gbroggi/software/xcain/cain_executable/cain_compiled.gcc'
+CAIN_PATH = '/home/drebot/Xsuite/cain_compiled.gcc'
 
 CUSTOM_ELEMENTS = {} 
 try:
@@ -54,9 +54,9 @@ TARGET_REMOVED_FRACTION = 0.01 # This means that we turn off laser when 1% is re
 #################################################################
 # File paths
 #################################################################
-home_fpath = '/home/gbroggi/forIllya/' # Change according to your setup
-env_fpath = 'fccee_z.json'
-colldb_fpath = 'fccee_z_double_phase.colldb.yaml'
+home_fpath = os.getcwd() # Absolute path is recommended for HTCondor
+env_fpath = 'fccee_z.json' # Absolute path is recommended for HTCondor
+colldb_fpath = 'fccee_z_double_phase.colldb.yaml' # Absolute path is recommended for HTCondor
 
 #################################################################
 # Output directories
@@ -221,7 +221,7 @@ line.insert(placements)
 #################################################################
 # NOTE: here we consider the optics without beam-beam
 #       to be discussed what to do in the future
-npart = N_NOMINAL_MACROPARTICLES * (1 + STRONG_BEAM_ASYMMETRY)
+npart = int(N_NOMINAL_MACROPARTICLES * (1 + STRONG_BEAM_ASYMMETRY))
 
 x_norm, px_norm = xp.generate_2D_gaussian(npart)
 y_norm, py_norm = xp.generate_2D_gaussian(npart)
