@@ -48,8 +48,8 @@ ELEMENT_START = 'qf9f_exit' # Exit of a QF in the Dx-free RF straight in PH
 
 N_TURNS = 10
 N_NOMINAL_MACROPARTICLES = 2000
-STRONG_BEAM_ASYMMETRY = 0.01 # This means that the strong beam (the one that we track, e+) has 1% more bunch intensity
-TARGET_REMOVED_FRACTION = 0.01 # This means that we turn off laser when 1% is removed
+WEAK_BEAM_ASYMMETRY = 0.10 # This means that the weak beam (the one that we track, e+) has 10% more bunch intensity
+TARGET_REMOVED_FRACTION = 0.10 # This means that we turn off laser when 10% is removed
 
 #################################################################
 # File paths
@@ -96,8 +96,8 @@ colldb.install_geant4_collimators(line=line, apertures=aperture, verbose=True)
 # Install emittance monitor
 #################################################################
 # NOTE: the monitor is installed at the beginning of the RF straight section in PH
-s_monitor = 78350.0
-mon = xc.EmittanceMonitor.install(line=line, name="emittance_monitor", at=s_monitor, stop_at_turn=N_TURNS)
+s_monitor = 55901.0
+mon = xc.EmittanceMonitor.install(line=line, name="emittance_monitor", at_s=s_monitor, stop_at_turn=N_TURNS)
 
 #################################################################
 # Install bounding apertures around emittance monitor
@@ -234,10 +234,8 @@ line.insert(placements)
 #################################################################
 # NOTE: here we consider the optics without beam-beam
 #       to be discussed what to do in the future
-npart = int(N_NOMINAL_MACROPARTICLES * (1 + STRONG_BEAM_ASYMMETRY))
-
-x_norm, px_norm = xp.generate_2D_gaussian(npart)
-y_norm, py_norm = xp.generate_2D_gaussian(npart)
+x_norm, px_norm = xp.generate_2D_gaussian(N_NOMINAL_MACROPARTICLES)
+y_norm, py_norm = xp.generate_2D_gaussian(N_NOMINAL_MACROPARTICLES)
 
 # The longitudinal closed orbit needs to be manually supplied for now
 element_index = line.element_names.index(ELEMENT_START)
@@ -246,14 +244,14 @@ delta_co = twiss['delta', ELEMENT_START]
 
 zeta, delta = xp.generate_longitudinal_coordinates(
     line=line,
-    num_particles=npart,
+    num_particles=N_NOMINAL_MACROPARTICLES,
     distribution='gaussian',
     sigma_z=SIGMA_Z
 )
 
 particles = line.build_particles(
-    _capacity=4*npart,
-    weight=BUNCH_INTENSITY / N_NOMINAL_MACROPARTICLES,
+    _capacity=4*N_NOMINAL_MACROPARTICLES,
+    weight=BUNCH_INTENSITY * WEAK_BEAM_ASYMMETRY / N_NOMINAL_MACROPARTICLES,
     x_norm=x_norm, px_norm=px_norm,
     y_norm=y_norm, py_norm=py_norm,
     zeta=zeta + zeta_co,
@@ -292,9 +290,9 @@ for turn in range(N_TURNS):
     line.track(particles, ele_start=ELEMENT_START, ele_stop=ELEMENT_START, num_turns=1)
 
     primaries = particles.filter(particles.particle_id == particles.parent_particle_id)
-    fraction_lost_primaries = (npart - primaries._num_active_particles) / npart
+    total_weight_primaries = primaries.weight[primaries.state > 0].sum()
 
-    if fraction_lost_primaries >= TARGET_REMOVED_FRACTION and laser_on:
+    if total_weight_primaries <= BUNCH_INTENSITY and laser_on:
         print(f'\nReached target removed fraction at turn {turn}. Turning off laser.')
         # Turn laser off by replacing laser element with simple marker
         env.elements['laser_off'] = xt.Marker()
