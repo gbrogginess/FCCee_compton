@@ -3,6 +3,7 @@ import sys
 import time
 import numpy as np
 import pandas as pd
+import xobjects as xo
 import xtrack as xt
 import xpart as xp
 import xfields as xf
@@ -14,6 +15,17 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 jobID = int(sys.argv[1])
+
+# For emittance tracking studies, we do not the full scattering in collimators with Geant4
+# in this case we use black absorbers instead
+lossmap = False
+
+#################################################################
+# Multi-threading
+#################################################################
+context = xo.ContextCpu(omp_num_threads='auto') # For maximum number of threads
+# context = xo.ContextCpu(omp_num_threads=1) # For 1 thread
+# context = xo.ContextCpu(omp_num_threads=8) # For 8 threads
 
 #################################################################
 # Laser-interaction
@@ -31,11 +43,13 @@ except ImportError:
 #################################################################
 # Constants
 #################################################################
-NEMITT_X = 64.2506e-06 # m (corresponds to 0.72 nm geometric emittance)
-NEMITT_Y = 0.12761e-06 # m (cooresponds to 1.43 pm geometric emittance)
-SIGMA_Z  = 16.7E-3     # m
+NEMITT_X                       = 64.2506e-06 # m (corresponds to 0.72 nm geometric emittance)
+NEMITT_Y                       = 0.12761e-06 # m (corresponds to 1.43 pm geometric emittance)
+EQUILIBRIUM_NEMITT_Y_BEAMBEAM  = 0.18294e-06 # m (corresponds to 2.05 pm geometric emittance)
 
-HALF_XING = 15E-3
+SIGMA_Z  = 16.7E-3 # m (equilibrium bunch length with beamstrahlung)
+
+HALF_XING = 15E-3 # rad (half-crossing angle)
 
 BUNCH_INTENSITY = 2E11
 
@@ -46,10 +60,10 @@ IP_NAMES = ['ip', 'ip:1', 'ip:3', 'ip:5']
 
 ELEMENT_START = 'qf9f_exit' # Exit of a QF in the Dx-free RF straight in PH
 
-N_TURNS = 10
-N_NOMINAL_MACROPARTICLES = 2000
-WEAK_BEAM_ASYMMETRY = 0.10 # This means that the weak beam (the one that we track, e+) has 10% more bunch intensity
-TARGET_REMOVED_FRACTION = 0.10 # This means that we turn off laser when 10% is removed
+N_TURNS = 1000
+N_NOMINAL_MACROPARTICLES = 10000
+WEAK_BEAM_ASYMMETRY = 0.05 # This means that the weak beam (the one that we track, e+) has 5% more bunch intensity
+TARGET_REMOVED_FRACTION = 0.05 # This means that we turn off laser when 5% is removed
 
 #################################################################
 # File paths
@@ -85,12 +99,21 @@ line = env.lines['fccee_p_ring']
 tab = line.get_table()
 
 #################################################################
+# Set nemitt_y in the Twiss defaults
+#################################################################
+# NOTE: This is needed to make the Twiss work with beam-beam
+line.twiss_default['nemitt_y'] = NEMITT_Y
+
+#################################################################
 # Install collimators
 #################################################################
 colldb = xc.CollimatorDatabase.from_yaml(colldb_fpath)
-
 aperture = xt.LimitEllipse(a=R_BEAMPIPE, b=R_BEAMPIPE)
-colldb.install_geant4_collimators(line=line, apertures=aperture, verbose=True)
+
+if lossmap:
+    colldb.install_geant4_collimators(line=line, apertures=aperture, verbose=True)
+else:
+    colldb.install_black_absorbers(line=line, apertures=aperture, verbose=True)
 
 #################################################################
 # Install emittance monitor
@@ -99,18 +122,19 @@ colldb.install_geant4_collimators(line=line, apertures=aperture, verbose=True)
 s_monitor = 55901.0
 mon = xc.EmittanceMonitor.install(line=line, name="emittance_monitor", at_s=s_monitor, stop_at_turn=N_TURNS)
 
-#################################################################
-# Install bounding apertures around emittance monitor
-#################################################################
-aper_name = 'emittance_monitor_aper'
-env.new(aper_name, xt.LimitEllipse, a=R_BEAMPIPE, b=R_BEAMPIPE)
-env.new(aper_name + '..0', aper_name, mode='replica')
-env.new(aper_name + '..1', aper_name, mode='replica')
+if lossmap:
+    #################################################################
+    # Install bounding apertures around emittance monitor
+    #################################################################
+    aper_name = 'emittance_monitor_aper'
+    env.new(aper_name, xt.LimitEllipse, a=R_BEAMPIPE, b=R_BEAMPIPE)
+    env.new(aper_name + '..0', aper_name, mode='replica')
+    env.new(aper_name + '..1', aper_name, mode='replica')
 
-line.insert([
-    env.place(aper_name + '..0', at='emittance_monitor@start'),
-    env.place(aper_name + '..1', at='emittance_monitor@end')
-])
+    line.insert([
+        env.place(aper_name + '..0', at='emittance_monitor@start'),
+        env.place(aper_name + '..1', at='emittance_monitor@end')
+    ])
 
 #################################################################
 # Assign optics to collimators
@@ -204,7 +228,7 @@ for ip_name in IP_NAMES:
                 slices_other_beam_Sigma_34    = n_slices*[0],
                 compt_x_min                   = 1e-4,
         )
-    beambeam.iscollective = True # This flag disables beam-beam in Twiss
+    # beambeam.iscollective = True # This flag disables beam-beam in Twiss
 
     name = f'beambeam_{ip_name}'
     env.elements[name] = beambeam.copy()
@@ -212,56 +236,81 @@ for ip_name in IP_NAMES:
 
 line.insert(beambeam_placements)
 
-#################################################################
-# Install beam-beam elements bounding apertures
-#################################################################
-tab = line.get_table()
-beambeam_names = tab.rows['beambeam.*'].name
+if lossmap:
+    #################################################################
+    # Install beam-beam elements bounding apertures
+    #################################################################
+    tab = line.get_table()
+    beambeam_names = tab.rows['beambeam.*'].name
 
-placements = []
-for nn in beambeam_names:
-    aper_base = f'{nn}_aper'
-    env.new(aper_base, xt.LimitEllipse, a=R_IP, b=R_IP)
-    for ii_aper, pos in enumerate(('start', 'end')):
-        aper_name = f'{aper_base}..{ii_aper}'
-        env.new(aper_name, aper_base, mode='replica')
-        placements.append(env.place(aper_name, at=f'{nn}@{pos}'))
+    placements = []
+    for nn in beambeam_names:
+        aper_base = f'{nn}_aper'
+        env.new(aper_base, xt.LimitEllipse, a=R_IP, b=R_IP)
+        for ii_aper, pos in enumerate(('start', 'end')):
+            aper_name = f'{aper_base}..{ii_aper}'
+            env.new(aper_name, aper_base, mode='replica')
+            placements.append(env.place(aper_name, at=f'{nn}@{pos}'))
 
-line.insert(placements)
+    line.insert(placements)
+
+#################################################################
+# Twiss with beam-beam
+#################################################################
+first_element = line.element_names[0]
+line.cycle(name_first_element=ELEMENT_START, inplace=True)
+twiss_beambeam = line.twiss()
 
 #################################################################
 # Prepare matched Gaussian bunch at ELEMENT_START
 #################################################################
-# NOTE: here we consider the optics without beam-beam
-#       to be discussed what to do in the future
-x_norm, px_norm = xp.generate_2D_gaussian(N_NOMINAL_MACROPARTICLES)
-y_norm, py_norm = xp.generate_2D_gaussian(N_NOMINAL_MACROPARTICLES)
+# NOTE: here we consider the optics with beam-beam
+#       and the equlibrium vertical emittance with beam-beam
+npart = int(N_NOMINAL_MACROPARTICLES * (1 + WEAK_BEAM_ASYMMETRY))
+x_norm, px_norm = xp.generate_2D_gaussian(npart)
+y_norm, py_norm = xp.generate_2D_gaussian(npart)
 
 # The longitudinal closed orbit needs to be manually supplied for now
 element_index = line.element_names.index(ELEMENT_START)
-zeta_co = twiss['zeta', ELEMENT_START]
-delta_co = twiss['delta', ELEMENT_START] 
+zeta_co = twiss_beambeam['zeta', ELEMENT_START]
+delta_co = twiss_beambeam['delta', ELEMENT_START] 
 
+# There is no way at the moment to pass a twiss table to this function
+# This function will unavoidably run a twiss for now
+# We have to use the cycled line here
 zeta, delta = xp.generate_longitudinal_coordinates(
     line=line,
-    num_particles=N_NOMINAL_MACROPARTICLES,
+    num_particles=npart,
     distribution='gaussian',
     sigma_z=SIGMA_Z
 )
 
+# There is no way at the moment to pass a twiss table to this function
+# This function will unavoidably run a twiss for now
+# We have to use the cycled line here
 particles = line.build_particles(
-    _capacity=4*N_NOMINAL_MACROPARTICLES,
-    weight=BUNCH_INTENSITY * WEAK_BEAM_ASYMMETRY / N_NOMINAL_MACROPARTICLES,
+    _capacity=4*npart,
+    weight=BUNCH_INTENSITY / N_NOMINAL_MACROPARTICLES,
     x_norm=x_norm, px_norm=px_norm,
     y_norm=y_norm, py_norm=py_norm,
     zeta=zeta + zeta_co,
     delta=delta + delta_co,
     nemitt_x=NEMITT_X,
-    nemitt_y=NEMITT_Y,
+    nemitt_y=EQUILIBRIUM_NEMITT_Y_BEAMBEAM,
     at_element=ELEMENT_START
     )
 
+# Cycle back the line to IPA
+line.cycle(name_first_element=first_element, inplace=True)
+tab = line.get_table()
+
+# Fix the starting position of the particle object
+particles.s = tab.rows[ELEMENT_START].s[0]
+particles.at_element = line.element_names.index(ELEMENT_START)
 particles.start_tracking_at_element = -1
+
+line.discard_tracker()
+line.build_tracker(_context=context)
 
 #################################################################
 # Configure radiation mode for tracking
@@ -270,12 +319,13 @@ line.configure_radiation(model='quantum',
                          model_beamstrahlung='quantum',
                          model_bhabha=None)
 
-#################################################################
-# Start Geant4 engine
-#################################################################
-seed = jobID
-xc.geant4.engine.seed = seed
-xc.geant4.engine.start(line=line)
+if lossmap:
+    #################################################################
+    # Start Geant4 engine
+    #################################################################
+    seed = jobID
+    xc.geant4.engine.seed = seed
+    xc.geant4.engine.start(line=line)
 
 #################################################################
 # Track!
@@ -308,26 +358,27 @@ print(f'Tracking {N_TURNS} turns took {time.time() - t0} s.')
 
 line.scattering.disable()
 
-#############################################################
-# Stop Geant4 engine
-#############################################################
-xc.geant4.engine.stop()
+if lossmap:
+    #################################################################
+    # Stop Geant4 engine
+    #################################################################
+    xc.geant4.engine.stop()
 
-#############################################################
-# Aperture loss interpolation
-#############################################################
-LossMap = xc.LossMap(line,
-                     part=particles,
-                     line_is_reversed=False,
-                     interpolation=0.1,
-                     weights=None,
-                     weight_function=None)
+    #############################################################
+    # Aperture loss interpolation
+    #############################################################
+    LossMap = xc.LossMap(line,
+                        part=particles,
+                        line_is_reversed=False,
+                        interpolation=0.1,
+                        weights=None,
+                        weight_function=None)
 
-#############################################################
-# Save xcoll loss map
-#############################################################
-lossmap_fpath = os.path.join(outputdata_dir, 'lossmap.json')
-LossMap.to_json(lossmap_fpath)
+    #############################################################
+    # Save xcoll loss map
+    #############################################################
+    lossmap_fpath = os.path.join(outputdata_dir, 'lossmap.json')
+    LossMap.to_json(lossmap_fpath)
 
 #############################################################
 # Extract and save info from emittance monitor
