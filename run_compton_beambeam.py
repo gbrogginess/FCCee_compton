@@ -387,12 +387,12 @@ monitor = line['emittance_monitor']
 
 # Extract quantities
 turns = np.array(monitor.turns)
+# Number of particles
+count = np.array(monitor.count)
+# Geometric emittances
 gemitt_x = np.array(monitor.gemitt_x)
 gemitt_y = np.array(monitor.gemitt_y)
-# Other quantities can be extracted: https://github.com/xsuite/xcoll/blob/main/xcoll/beam_elements/monitor.py
-
-# Store in dataframe and save
-# df_emittance = pd.DataFrame({'turn': turns, 'gemitt_x': gemitt_x, 'gemitt_y': gemitt_y})
+# Beam sizes
 sigma_x  = np.sqrt(monitor.x_x_var)
 sigma_y  = np.sqrt(monitor.y_y_var)
 sigma_z  = np.sqrt(monitor.zeta_zeta_var)
@@ -400,9 +400,12 @@ sigma_z  = np.sqrt(monitor.zeta_zeta_var)
 sigma_px = np.sqrt(monitor.px_px_var)
 sigma_py = np.sqrt(monitor.py_py_var)
 sigma_pz = np.sqrt(monitor.pzeta_pzeta_var)
+# Other quantities can be extracted: https://github.com/xsuite/xcoll/blob/main/xcoll/beam_elements/monitor.py
 
+# Store in dataframe and save
 df_emittance = pd.DataFrame({
-    'turn': turns,
+    'turn': turns,   
+    'count': count,
     'gemitt_x': gemitt_x,
     'gemitt_y': gemitt_y,
     'sigma_x': sigma_x,
