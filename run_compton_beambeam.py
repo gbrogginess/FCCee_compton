@@ -206,7 +206,7 @@ for ip_name in IP_NAMES:
     sigma_py = tab_sigmas['sigma_py', ip_name]
 
     beambeam = xf.BeamBeamBiGaussian3D(
-                #_context=context,
+                _context=context,
                 config_for_update = None,
                 other_beam_q0=-1, # charge of the other beam (-1 for electrons)
                 phi=HALF_XING, # half-crossing angle in radians
